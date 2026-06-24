@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Pricing Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f5f5f5; color: #333; }
+        .box { background: white; padding: 20px; margin-bottom: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* Action buttons layout - Top Sticky / Clear Visibility */
+        .top-action-bar { 
+            margin-bottom: 20px; 
+            padding: 15px; 
+            background: #fff; 
+            border-radius: 6px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: flex-start;
+        }
+        .download-btn { 
+            background-color: #d32f2f; /* Red PDF color theme */
+            color: white; 
+            border: none; 
+            padding: 14px 28px; 
+            font-size: 16px;
+            font-weight: bold; 
+            cursor: pointer; 
+            border-radius: 4px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+            transition: background 0.2s;
+        }
+        .download-btn:hover { background-color: #b71c1c; }
+
+        /* Collage Inline Layout */
+        .collage-inline-container { 
+            width: 100%; 
+            min-height: 150px;
+            background: #eaeaea; 
+            border: 2px dashed #bbb; 
+            display: flex; 
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 15px;
+            box-sizing: border-box;
+            align-items: center;
+        }
+        .collage-img-item { 
+            width: 140px;
+            height: 140px;
+            object-fit: cover; 
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            border-radius: 4px;
+            transition: transform 0.2s;
+        }
+        .collage-img-item:hover { transform: scale(1.03); }
+
+        /* Zoom Modal Styling */
+        .zoom-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        .zoom-modal-content-wrapper { width: 80%; height: 80%; overflow: auto; display: flex; justify-content: center; align-items: center; background: #222; border-radius: 8px; position: relative; }
+        #modal-img { max-width: 100%; max-height: 100%; transition: transform 0.1s ease; transform-origin: center; }
+        .modal-controls { margin-top: 15px; display: flex; gap: 10px; }
+        .modal-btn { background: #fff; color: #333; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        .modal-close { position: absolute; top: 15px; right: 15px; background: red; color: white; border: none; font-size: 20px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; z-index: 1010; }
+
+        /* Categories & Grid Styling */
+        .product-group { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .grid-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .image-price-card { width: 120px; border: 1px solid #ddd; padding: 5px; text-align: center; background: #fff; position: relative; }
+        .large-img-item { width: 100%; height: 90px; object-fit: cover; cursor: pointer; }
+        .card-price-input-wrapper { margin-top: 5px; display: flex; align-items: center; justify-content: center; }
+        .card-price-input-wrapper input { width: 60px; margin-left: 3px; }
+        .editable-lbl { font-weight: bold; border-bottom: 1px dashed #333; cursor: pointer; }
+        
+        /* Summary Table Styling */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background: #eee; }
+        .grand-total { font-weight: bold; background: #eef7ee; }
+        .qty-input { width: 70px; padding: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="top-action-bar">
+        <button class="download-btn" onclick="exportDashboardToPDF()">📩 DOWNLOAD AS PDF</button>
+    </div>
+
+    <div id="dashboard-print-area">
+        <div class="box">
+            <h3>Main Collage Overview (All Images In Line)</h3>
+            <div onclick="triggerUpload(this)" style="padding: 15px; background: #e3f2fd; border: 1px solid #90caf9; display: inline-block; cursor: pointer; border-radius: 4px; margin-bottom: 15px;">
+                Click here to upload Collage images
+                <input type="file" multiple accept="image/*" onchange="generateCollage(this)" style="display: none;">
+            </div>
+            
+            <div id="overview-collage-output" class="collage-inline-container">
+                <p style="color: #666; width: 100%; text-align: center; margin: 0;">No images uploaded. Click the button above.</p>
+            </div>
+            <p style="text-align: center; color: #666; font-size: 13px; margin-top: 10px;">*Click on any image to Zoom In & Out</p>
+        </div>
+
+        <div class="box">
+            <h3>Product Categories</h3>
+            
+            <div class="product-group">
+                <span class="editable-lbl" contenteditable="true" id="lbl-prodA" oninput="syncLabels()">Cat A: Chemical:</span>
+                <span style="float: right;">Amount: RM <span id="total-val-prodA">0.00</span></span>
+                <div style="margin-top: 5px;"><input type="file" multiple accept="image/*" onchange="previewLargeGrid(this, 'prodA')"></div>
+                <div id="grid-prodA" class="grid-container"></div>
+            </div>
+
+            <div class="product-group">
+                <span class="editable-lbl" contenteditable="true" id="lbl-prodB" oninput="syncLabels()">Cat B: Hardware:</span>
+                <span style="float: right;">Amount: RM <span id="total-val-prodB">0.00</span></span>
+                <div style="margin-top: 5px;"><input type="file" multiple accept="image/*" onchange="previewLargeGrid(this, 'prodB')"></div>
+                <div id="grid-prodB" class="grid-container"></div>
+            </div>
+
+            <div class="product-group">
+                <span class="editable-lbl" contenteditable="true" id="lbl-prodC" oninput="syncLabels()">Cat C: Premium Gear:</span>
+                <span style="float: right;">Amount: RM <span id="total-val-prodC">0.00</span></span>
+                <div style="margin-top: 5px;"><input type="file" multiple accept="image/*" onchange="previewLargeGrid(this, 'prodC')"></div>
+                <div id="grid-prodC" class="grid-container"></div>
+            </div>
+
+            <div class="product-group">
+                <span class="editable-lbl" contenteditable="true" id="lbl-prodD" oninput="syncLabels()">Cat D: Stationary:</span>
+                <span style="float: right;">Amount: RM <span id="total-val-prodD">0.00</span></span>
+                <div style="margin-top: 5px;"><input type="file" multiple accept="image/*" onchange="previewLargeGrid(this, 'prodD')"></div>
+                <div id="grid-prodD" class="grid-container"></div>
+            </div>
+
+            <div class="product-group">
+                <span class="editable-lbl" contenteditable="true" id="lbl-prodE" oninput="syncLabels()">Cat E: Lifestyle:</span>
+                <span style="float: right;">Amount: RM <span id="total-val-prodE">0.00</span></span>
+                <div style="margin-top: 5px;"><input type="file" multiple accept="image/*" onchange="previewLargeGrid(this, 'prodE')"></div>
+                <div id="grid-prodE" class="grid-container"></div>
+            </div>
+
+            <div class="product-group">
+                <span class="editable-lbl" contenteditable="true" id="lbl-prodF" oninput="syncLabels()">Cat F: Household:</span>
+                <span style="float: right;">Amount: RM <span id="total-val-prodF">0.00</span></span>
+                <div style="margin-top: 5px;"><input type="file" multiple accept="image/*" onchange="previewLargeGrid(this, 'prodF')"></div>
+                <div id="grid-prodF" class="grid-container"></div>
+            </div>
+        </div>
+
+        <div class="box">
+            <h3>Summary Matrix</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Unit Price (RM)</th>
+                        <th>Est Qty</th>
+                        <th>Revenue (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="matrix-lbl-prodA">Cat A: Chemical</td>
+                        <td id="matrix-prodA">0.00</td>
+                        <td><input type="number" class="qty-input" id="qty-prodA" value="0" min="0" oninput="calculateCategorySum('prodA')"></td>
+                        <td>RM <span id="revenue-prodA">0.00</span></td>
+                    </tr>
+                    <tr>
+                        <td id="matrix-lbl-prodB">Cat B: Hardware</td>
+                        <td id="matrix-prodB">0.00</td>
+                        <td><input type="number" class="qty-input" id="qty-prodB" value="0" min="0" oninput="calculateCategorySum('prodB')"></td>
+                        <td>RM <span id="revenue-prodB">0.00</span></td>
+                    </tr>
+                    <tr>
+                        <td id="matrix-lbl-prodC">Cat C: Premium Gear</td>
+                        <td id="matrix-prodC">0.00</td>
+                        <td><input type="number" class="qty-input" id="qty-prodC" value="0" min="0" oninput="calculateCategorySum('prodC')"></td>
+                        <td>RM <span id="revenue-prodC">0.00</span></td>
+                    </tr>
+                    <tr>
+                        <td id="matrix-lbl-prodD">Cat D: Stationary</td>
+                        <td id="matrix-prodD">0.00</td>
+                        <td><input type="number" class="qty-input" id="qty-prodD" value="0" min="0" oninput="calculateCategorySum('prodD')"></td>
+                        <td>RM <span id="revenue-prodD">0.00</span></td>
+                    </tr>
+                    <tr>
+                        <td id="matrix-lbl-prodE">Cat E: Lifestyle</td>
+                        <td id="matrix-prodE">0.00</td>
+                        <td><input type="number" class="qty-input" id="qty-prodE" value="0" min="0" oninput="calculateCategorySum('prodE')"></td>
+                        <td>RM <span id="revenue-prodE">0.00</span></td>
+                    </tr>
+                    <tr>
+                        <td id="matrix-lbl-prodF">Cat F: Household</td>
+                        <td id="matrix-prodF">0.00</td>
+                        <td><input type="number" class="qty-input" id="qty-prodF" value="0" min="0" oninput="calculateCategorySum('prodF')"></td>
+                        <td>RM <span id="revenue-prodF">0.00</span></td>
+                    </tr>
+                    <tr class="grand-total">
+                        <td colspan="3">Grand Total Revenue</td>
+                        <td>RM <span id="grand-total-val">0.00</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="zoomModal" class="zoom-modal">
+        <div class="zoom-modal-content-wrapper">
+            <button class="modal-close" onclick="closeZoomModal()">&times;</button>
+            <img id="modal-img" src="" alt="Zoomed View">
+        </div>
+        <div class="modal-controls">
+            <button class="modal-btn" onclick="applyZoom(0.2)">Zoom In (+)</button>
+            <button class="modal-btn" onclick="applyZoom(-0.2)">Zoom Out (-)</button>
+            <button class="modal-btn" onclick="resetZoom()">Reset</button>
+            <button class="modal-btn" style="background: #555; color: #fff;" onclick="closeZoomModal()">Close</button>
+        </div>
+    </div>
+
+<script>
+    let currentZoomScale = 1;
+    const targetKeys = ['prodA', 'prodB', 'prodC', 'prodD', 'prodE', 'prodF'];
+
+    document.addEventListener('input', function(e) {
+        if(e.target.hasAttribute('contenteditable')) {
+            localStorage.setItem(e.target.id || e.target.innerText, e.target.innerHTML);
+        }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const editableElements = document.querySelectorAll('[contenteditable="true"]');
+        editableElements.forEach(el => {
+            const preservedState = localStorage.getItem(el.id || el.innerText);
+            if(preservedState !== null) { el.innerHTML = preservedState; }
+        });
+        
+        targetKeys.forEach(key => {
+            const savedQty = localStorage.getItem(`qty-cache-${key}`);
+            const qtyInput = document.getElementById(`qty-${key}`);
+            if (savedQty !== null && qtyInput) { qtyInput.value = savedQty; }
+
+            const savedGridData = localStorage.getItem(`grid-cache-${key}`);
+            const container = document.getElementById(`grid-${key}`);
+            
+            if(savedGridData && container) {
+                container.innerHTML = savedGridData;
+                
+                const inputs = container.querySelectorAll(`.input-item-${key}`);
+                inputs.forEach((inputField, index) => {
+                    const savedPrice = localStorage.getItem(`price-cache-${key}-${index}`);
+                    if (savedPrice !== null && savedPrice !== '') {
+                        inputField.value = savedPrice;
+                    }
+                    
+                    inputField.addEventListener('input', () => calculateCategorySum(key));
+                    inputField.addEventListener('change', () => calculateCategorySum(key));
+                });
+            }
+            attachGridZoomEvents(key);
+            calculateCategorySum(key);
+        });
+
+        const savedCollage = localStorage.getItem('collage-cache-main');
+        if(savedCollage) {
+            const overviewCollage = document.getElementById('overview-collage-output');
+            if (overviewCollage) {
+                overviewCollage.innerHTML = savedCollage;
+                initInlineCollageEvents();
+            }
+        }
+        syncLabels();
+    });
+
+    function triggerUpload(zone) {
+        if (event.target.tagName !== 'INPUT') {
+            zone.querySelector('input[type="file"]').click();
+        }
+    }
+
+    function generateCollage(input) {
+        const files = input.files;
+        const displayContainer = document.getElementById('overview-collage-output');
+        if (!displayContainer) return;
+        displayContainer.innerHTML = '';
+        if (!files.length) return;
+
+        let loadedCount = 0;
+        Array.from(files).forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'collage-img-item';
+                img.onclick = function() { openZoomModal(this.src); };
+
+                displayContainer.appendChild(img);
+                loadedCount++;
+                if(loadedCount === files.length) {
+                    localStorage.setItem('collage-cache-main', displayContainer.innerHTML);
+                }
+            }
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function initInlineCollageEvents() {
+        const items = document.querySelectorAll('.collage-img-item');
+        items.forEach((img) => {
+            img.onclick = function() { openZoomModal(this.src); };
+        });
+    }
+
+    function openZoomModal(src) {
+        const modal = document.getElementById('zoomModal');
+        const modalImg = document.getElementById('modal-img');
+        modalImg.src = src;
+        modal.style.display = 'flex';
+        resetZoom();
+    }
+
+    function closeZoomModal() {
+        document.getElementById('zoomModal').style.display = 'none';
+    }
+
+    function applyZoom(amount) {
+        currentZoomScale += amount;
+        if (currentZoomScale < 0.5) currentZoomScale = 0.5;
+        if (currentZoomScale > 5) currentZoomScale = 5;
+        document.getElementById('modal-img').style.transform = `scale(${currentZoomScale})`;
+    }
+
+    function resetZoom() {
+        currentZoomScale = 1;
+        document.getElementById('modal-img').style.transform = `scale(${currentZoomScale})`;
+    }
+
+    function attachGridZoomEvents(productKey) {
+        const container = document.getElementById(`grid-${productKey}`);
+        if(container) {
+            const imgs = container.querySelectorAll('.large-img-item');
+            imgs.forEach(img => {
+                img.onclick = function() { openZoomModal(this.src); };
+            });
+        }
+    }
+
+    function previewLargeGrid(input, productKey) {
+        const files = input.files;
+        const container = document.getElementById(`grid-${productKey}`);
+        if (!container) return;
+        container.innerHTML = ''; 
+        if (!files.length) return;
+        let processedImages = 0;
+
+        const keys = Object.keys(localStorage);
+        keys.forEach(k => {
+            if (k.startsWith(`price-cache-${productKey}-`)) { localStorage.removeItem(k); }
+        });
+
+        Array.from(files).forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const card = document.createElement('div');
+                card.className = 'image-price-card';
+
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'large-img-item';
+
+                const inputWrapper = document.createElement('div');
+                inputWrapper.className = 'card-price-input-wrapper';
+                inputWrapper.innerHTML = `<span>RM</span>`;
+
+                const priceInput = document.createElement('input');
+                priceInput.type = 'number';
+                priceInput.placeholder = '0.00';
+                priceInput.step = '0.01';
+                priceInput.className = `input-item-${productKey}`;
+                
+                priceInput.addEventListener('input', () => calculateCategorySum(productKey));
+                priceInput.addEventListener('change', () => calculateCategorySum(productKey));
+
+                inputWrapper.appendChild(priceInput);
+                card.appendChild(img);
+                card.appendChild(inputWrapper);
+                container.appendChild(card);
+                
+                processedImages++;
+                if(processedImages === files.length) {
+                    localStorage.setItem(`grid-cache-${productKey}`, container.innerHTML);
+                    attachGridZoomEvents(productKey);
+                    calculateCategorySum(productKey);
+                }
+            }
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function calculateCategorySum(productKey) {
+        const container = document.getElementById(`grid-${productKey}`);
+        let aggregateSum = 0;
+
+        if (container) {
+            const matchingInputs = container.querySelectorAll(`.input-item-${productKey}`);
+            matchingInputs.forEach((input, index) => {
+                const currentVal = parseFloat(input.value);
+                if (!isNaN(currentVal)) {
+                    aggregateSum += currentVal;
+                    input.setAttribute('value', input.value); 
+                    try {
+                        localStorage.setItem(`price-cache-${productKey}-${index}`, input.value);
+                    } catch(e) { console.warn("Storage quota exceeded for price cache."); }
+                } else {
+                    input.removeAttribute('value');
+                    try {
+                        localStorage.setItem(`price-cache-${productKey}-${index}`, '');
+                    } catch(e) {}
+                }
+            });
+            
+            // Wrapped in try-catch so a storage error won't crash the calculation script
+            try {
+                localStorage.setItem(`grid-cache-${productKey}`, container.innerHTML);
+            } catch(e) {
+                console.error("Failed to save grid HTML to localStorage (Quota Exceeded), but calculation will continue:", e);
+            }
+        }
+
+        const formattedOutput = aggregateSum.toFixed(2);
+        const totalValEl = document.getElementById(`total-val-${productKey}`);
+        const matrixEl = document.getElementById(`matrix-${productKey}`);
+        
+        if(totalValEl) totalValEl.innerText = formattedOutput;
+        if(matrixEl) matrixEl.innerText = formattedOutput;
+        
+        const qtyInput = document.getElementById(`qty-${productKey}`);
+        const qtyVal = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
+        
+        if(qtyInput) {
+            try {
+                localStorage.setItem(`qty-cache-${productKey}`, qtyInput.value);
+            } catch(e) {}
+        }
+
+        const calculatedRevenue = aggregateSum * qtyVal;
+        const revenueEl = document.getElementById(`revenue-${productKey}`);
+        if(revenueEl) revenueEl.innerText = calculatedRevenue.toFixed(2);
+
+        updateGrandTotalSummary();
+    }
+
+    function updateGrandTotalSummary() {
+        let cumulativeTotalRevenue = 0;
+        targetKeys.forEach(key => {
+            const el = document.getElementById(`revenue-${key}`);
+            if(el) {
+                const innerTxtVal = parseFloat(el.innerText);
+                if(!isNaN(innerTxtVal)) { cumulativeTotalRevenue += innerTxtVal; }
+            }
+        });
+        const grandTotalVal = document.getElementById('grand-total-val');
+        if (grandTotalVal) grandTotalVal.innerText = cumulativeTotalRevenue.toFixed(2);
+    }
+
+    function syncLabels() {
+        targetKeys.forEach(key => {
+            const sourceEl = document.getElementById(`lbl-${key}`);
+            const targetEl = document.getElementById(`matrix-lbl-${key}`);
+            if(sourceEl && targetEl) {
+                targetEl.innerText = sourceEl.innerText.replace(/:/g, '').replace(/Cat [A-Z]/g, '').trim();
+            }
+        });
+    }
+
+    // GENERATE PDF FUNCTION
+    function exportDashboardToPDF() {
+        const element = document.getElementById('dashboard-print-area');
+        const opt = {
+            margin:       0.3,
+            filename:     'Product_Management_Dashboard.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, logging: false },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+</body>
+</html>
